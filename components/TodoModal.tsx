@@ -23,6 +23,7 @@ const TodoModal: React.FC<TodoModalProps> = ({ todo, tags, onClose, onSave, onDe
   const [tagId, setTagId] = useState<string | null>(todo.tagId);
   const [subtasks, setSubtasks] = useState<Subtask[]>(todo.subtasks || []);
   const [newSubtaskText, setNewSubtaskText] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState<string>(todo.estimatedTime?.toString() || '');
 
   // Close on ESC
   useEffect(() => {
@@ -41,6 +42,7 @@ const TodoModal: React.FC<TodoModalProps> = ({ todo, tags, onClose, onSave, onDe
       day,
       timeBlock,
       tagId: tagId || '',
+      estimatedTime: parseInt(estimatedTime) || 0,
       subtasks
     };
     onSave(updatedTodo);
@@ -214,11 +216,32 @@ const TodoModal: React.FC<TodoModalProps> = ({ todo, tags, onClose, onSave, onDe
               </div>
             </div>
 
+            {/* Estimated Time */}
+            <div>
+               <label className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                  <ClockIcon className="w-4 h-4" /> Оценка времени (минуты)
+               </label>
+               <div className="relative">
+                  <input
+                     type="number"
+                     step="5"
+                     min="0"
+                     value={estimatedTime}
+                     onChange={(e) => setEstimatedTime(e.target.value)}
+                     placeholder="15, 30, 60..."
+                     className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                  />
+                  <div className="absolute right-3 top-2 text-xs text-gray-400 font-medium pointer-events-none">
+                     мин.
+                  </div>
+               </div>
+            </div>
+
             {/* Time Block Selector - Hide if Backlog */}
             {day !== 'Backlog' && (
               <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                  <ClockIcon className="w-4 h-4" /> Время
+                  <ClockIcon className="w-4 h-4" /> Время выполнения
                 </label>
                 <div className="flex flex-col gap-2">
                   {[

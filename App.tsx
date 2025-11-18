@@ -39,9 +39,9 @@ const App: React.FC = () => {
   }, []);
 
   // Handlers
-  const handleAddTodo = async (text: string, day: DayOfWeek, timeBlock: TimeBlock, tagId: string | null) => {
+  const handleAddTodo = async (text: string, day: DayOfWeek, timeBlock: TimeBlock, tagId: string | null, estimatedTime: number) => {
     try {
-      const newTodo = await todoService.add(text, day, timeBlock, tagId);
+      const newTodo = await todoService.add(text, day, timeBlock, tagId, estimatedTime);
       setTodos(prev => [...prev, newTodo]); 
     } catch (error) {
       console.error('Error adding todo', error);

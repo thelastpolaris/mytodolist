@@ -1,14 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { DayOfWeek, Todo, DAYS_OF_WEEK, ALL_COLUMNS, TimeBlock, Tag, COLOR_PALETTE } from '../types';
+import { DayOfWeek, Todo, ALL_COLUMNS, TimeBlock, Tag, COLOR_PALETTE } from '../types';
 import TodoItem from './TodoItem';
-import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon, MorningIcon, SunIcon, MoonIcon, ArchiveBoxIcon, ArrowsPointingOutIcon } from './Icons';
+import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon, MorningIcon, SunIcon, MoonIcon, ArchiveBoxIcon, ArrowsPointingOutIcon, ClockIcon } from './Icons';
 
 interface DayColumnProps {
   day: DayOfWeek;
   todos: Todo[];
   tags: Tag[];
-  onAddTodo: (text: string, day: DayOfWeek, timeBlock: TimeBlock, tagId: string | null) => void;
+  onAddTodo: (text: string, day: DayOfWeek, timeBlock: TimeBlock, tagId: string | null, estimatedTime: number) => void;
   onToggleTodo: (id: string) => void;
   onDeleteTodo: (id: string) => void;
   onDropTodo: (todoId: string, targetDay: DayOfWeek) => void;
@@ -38,6 +38,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
   isFocused
 }) => {
   const [inputValue, setInputValue] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState<string>(''); // Keep as string for input handling
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock>('day');
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -60,8 +61,10 @@ const DayColumn: React.FC<DayColumnProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim()) {
-      onAddTodo(inputValue.trim(), day, selectedTimeBlock, selectedTagId);
+      const time = parseInt(estimatedTime);
+      onAddTodo(inputValue.trim(), day, selectedTimeBlock, selectedTagId, isNaN(time) ? 0 : time);
       setInputValue('');
+      setEstimatedTime('');
     }
   };
 
@@ -91,12 +94,35 @@ const DayColumn: React.FC<DayColumnProps> = ({
     setShowMenu(false);
   };
 
+  // Helper to format duration nicely
+  const formatDuration = (minutes: number) => {
+    if (minutes === 0) return '0м';
+    if (minutes < 60) return `${minutes}м`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}ч ${m}м` : `${h}ч`;
+  };
+
   // Calculate days for submenu
   const otherDays = ALL_COLUMNS.filter(d => d !== day);
   const activeTodosCount = todos.filter(t => !t.completed).length;
 
   const isToday = day === new Date().toLocaleDateString('ru-RU', { weekday: 'long' }).replace(/^./, str => str.toUpperCase());
   const isWeekend = day === 'Суббота' || day === 'Воскресенье';
+
+  // Calculate Time Stats (Minutes)
+  const totalMinutes = todos.reduce((sum, todo) => sum + (todo.estimatedTime || 0), 0);
+  const doneMinutes = todos.reduce((sum, todo) => sum + (todo.completed ? (todo.estimatedTime || 0) : 0), 0);
+  const progressPercent = totalMinutes > 0 ? Math.min(100, (doneMinutes / totalMinutes) * 100) : 0;
+  
+  // Determine Load Color based on total minutes (4h = 240m, 7.5h = 450m)
+  let loadColorClass = 'text-gray-500 bg-gray-100 border-gray-200';
+  if (totalMinutes > 0) {
+      if (totalMinutes <= 240) loadColorClass = 'text-green-700 bg-green-50 border-green-200';
+      else if (totalMinutes <= 450) loadColorClass = 'text-blue-700 bg-blue-50 border-blue-200';
+      else if (totalMinutes <= 540) loadColorClass = 'text-orange-700 bg-orange-50 border-orange-200';
+      else loadColorClass = 'text-red-700 bg-red-50 border-red-200';
+  }
 
   // Group todos by time block
   const morningTodos = todos.filter(t => t.timeBlock === 'morning');
@@ -153,64 +179,86 @@ const DayColumn: React.FC<DayColumnProps> = ({
     >
       {/* Header */}
       <div className={`
-        p-3 border-b border-gray-100 flex justify-between items-center rounded-t-xl
+        p-3 border-b border-gray-100 flex flex-col gap-2 rounded-t-xl
         ${isFocused ? 'bg-white py-4' : ''}
         ${!isFocused && isBacklog ? 'bg-gray-100' : !isFocused && isWeekend ? 'bg-red-50/50' : !isFocused ? 'bg-gray-50/50' : ''}
       `}>
-        <div className="flex items-center gap-2">
-            {isBacklog && <ArchiveBoxIcon className="w-5 h-5 text-gray-500" />}
-            <h3 className={`font-bold text-lg ${!isFocused && isBacklog ? 'text-gray-600' : !isFocused && isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
-              {isBacklog ? 'Бэклог' : day}
-            </h3>
-            <span className="bg-white px-2 py-0.5 rounded-md text-xs font-medium text-gray-400 border border-gray-100 shadow-sm">
-              {todos.length}
-            </span>
+        <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+                {isBacklog && <ArchiveBoxIcon className="w-5 h-5 text-gray-500" />}
+                <h3 className={`font-bold text-lg ${!isFocused && isBacklog ? 'text-gray-600' : !isFocused && isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
+                  {isBacklog ? 'Бэклог' : day}
+                </h3>
+                <span className="bg-white px-2 py-0.5 rounded-md text-xs font-medium text-gray-400 border border-gray-100 shadow-sm">
+                  {todos.length}
+                </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Focus Button */}
+              {!isSelectionMode && !isFocused && (
+                 <button
+                   onClick={onFocus}
+                   className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all"
+                   title="Фокусировка на этом дне"
+                 >
+                   <ArrowsPointingOutIcon className="w-5 h-5" />
+                 </button>
+              )}
+
+              {/* Context Menu */}
+              {!isSelectionMode && todos.length > 0 && (
+                  <div className="relative" ref={menuRef}>
+                      <button 
+                          onClick={() => setShowMenu(!showMenu)}
+                          className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all"
+                      >
+                          <DotsHorizontalIcon className="w-5 h-5" />
+                      </button>
+
+                      {showMenu && (
+                          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 z-50 p-1 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                              <div className="text-xs font-semibold text-gray-400 px-2 py-1.5 uppercase tracking-wider">
+                                  Перенести активные ({activeTodosCount})
+                              </div>
+                              <div className="max-h-48 overflow-y-auto">
+                                  {otherDays.map(targetDay => (
+                                      <button
+                                          key={targetDay}
+                                          onClick={() => handleMoveAllTo(targetDay)}
+                                          className="w-full text-left px-2 py-1.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-md flex items-center gap-2 transition-colors"
+                                      >
+                                          <ArrowRightIcon className="w-4 h-4 text-gray-400" />
+                                          <span>В {targetDay === 'Backlog' ? 'Бэклог' : targetDay}</span>
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
+            </div>
         </div>
-        
-        <div className="flex items-center gap-1">
-          {/* Focus Button - Only show if not already focused and not selecting */}
-          {!isSelectionMode && !isFocused && (
-             <button
-               onClick={onFocus}
-               className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all"
-               title="Фокусировка на этом дне"
-             >
-               <ArrowsPointingOutIcon className="w-5 h-5" />
-             </button>
-          )}
 
-          {/* Context Menu */}
-          {!isSelectionMode && todos.length > 0 && (
-              <div className="relative" ref={menuRef}>
-                  <button 
-                      onClick={() => setShowMenu(!showMenu)}
-                      className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all"
-                  >
-                      <DotsHorizontalIcon className="w-5 h-5" />
-                  </button>
-
-                  {showMenu && (
-                      <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 z-50 p-1 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                          <div className="text-xs font-semibold text-gray-400 px-2 py-1.5 uppercase tracking-wider">
-                              Перенести активные ({activeTodosCount})
-                          </div>
-                          <div className="max-h-48 overflow-y-auto">
-                              {otherDays.map(targetDay => (
-                                  <button
-                                      key={targetDay}
-                                      onClick={() => handleMoveAllTo(targetDay)}
-                                      className="w-full text-left px-2 py-1.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-md flex items-center gap-2 transition-colors"
-                                  >
-                                      <ArrowRightIcon className="w-4 h-4 text-gray-400" />
-                                      <span>В {targetDay === 'Backlog' ? 'Бэклог' : targetDay}</span>
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                  )}
+        {/* Time Progress Bar */}
+        {totalMinutes > 0 && (
+           <div className="flex flex-col gap-1 mt-1">
+              <div className="flex justify-between items-end">
+                  <div className={`flex items-center gap-1 text-[10px] font-bold ${loadColorClass} px-1.5 rounded`}>
+                     <span>Сделано: {formatDuration(doneMinutes)}</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-gray-400">
+                    из {formatDuration(totalMinutes)}
+                  </span>
               </div>
-          )}
-        </div>
+              <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                 <div 
+                   className={`h-full rounded-full transition-all duration-500 ${totalMinutes <= 240 ? 'bg-green-500' : totalMinutes <= 450 ? 'bg-blue-500' : 'bg-orange-500'}`} 
+                   style={{ width: `${progressPercent}%` }}
+                 />
+              </div>
+           </div>
+        )}
       </div>
 
       {/* List */}
@@ -328,21 +376,37 @@ const DayColumn: React.FC<DayColumnProps> = ({
               </div>
             </div>
 
-            <div className="relative">
-              <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={isBacklog ? "Задача в бэклог..." : "Новая задача..."}
-                  className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-400"
-              />
-              <button 
-                  type="submit"
-                  disabled={!inputValue.trim()}
-                  className="absolute right-1 top-1 p-1 text-indigo-500 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                  <PlusIcon className="w-5 h-5" />
-              </button>
+            <div className="flex gap-2">
+               {/* Time Input - Compact */}
+               <div className="relative w-16 flex-shrink-0">
+                 <input
+                    type="number"
+                    step="5"
+                    min="0"
+                    value={estimatedTime}
+                    onChange={(e) => setEstimatedTime(e.target.value)}
+                    placeholder="Мин"
+                    className="w-full pl-2 pr-1 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-xs placeholder:text-gray-300"
+                 />
+               </div>
+
+               {/* Main Text Input */}
+               <div className="relative flex-1">
+                  <input
+                     type="text"
+                     value={inputValue}
+                     onChange={(e) => setInputValue(e.target.value)}
+                     placeholder={isBacklog ? "Задача в бэклог..." : "Новая задача..."}
+                     className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-400"
+                  />
+                  <button 
+                     type="submit"
+                     disabled={!inputValue.trim()}
+                     className="absolute right-1 top-1 p-1 text-indigo-500 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                     <PlusIcon className="w-5 h-5" />
+                  </button>
+               </div>
             </div>
         </form>
       )}

@@ -53,6 +53,7 @@ export const todoService = {
         day: todo.day || todayName,
         timeBlock: todo.timeBlock || 'day',
         tagId: todo.tagId || (todo.tag && todo.tag !== 'none' ? todo.tag : null),
+        estimatedTime: todo.estimatedTime || 0, // Default to 0
         description: todo.description || '',
         subtasks: todo.subtasks || []
       }));
@@ -61,7 +62,7 @@ export const todoService = {
     });
   },
 
-  add: (text: string, day: DayOfWeek, timeBlock: TimeBlock = 'day', tagId: string | null = null): Promise<Todo> => {
+  add: (text: string, day: DayOfWeek, timeBlock: TimeBlock = 'day', tagId: string | null = null, estimatedTime: number = 0): Promise<Todo> => {
     return new Promise((resolve) => {
       const newTodo: Todo = {
         id: generateId(),
@@ -71,6 +72,7 @@ export const todoService = {
         day,
         timeBlock,
         tagId: tagId || '',
+        estimatedTime,
         description: '',
         subtasks: []
       };

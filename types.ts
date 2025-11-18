@@ -73,6 +73,7 @@ export interface Todo {
   day: DayOfWeek;
   timeBlock: TimeBlock;
   tagId: string; 
+  estimatedTime?: number; // Added field for minutes
   description?: string;
   subtasks?: Subtask[];
 }

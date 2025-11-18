@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Todo, Tag, COLOR_PALETTE } from '../types';
-import { CheckIcon, TrashIcon, CheckCircleIcon, ListBulletIcon, ChatBubbleLeftIcon } from './Icons';
+import { CheckIcon, TrashIcon, CheckCircleIcon, ListBulletIcon, ChatBubbleLeftIcon, ClockIcon } from './Icons';
 
 interface TodoItemProps {
   todo: Todo;
@@ -43,6 +43,13 @@ const TodoItem: React.FC<TodoItemProps> = ({
     }
   };
 
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) return `${minutes}м`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}ч ${m}м` : `${h}ч`;
+  };
+
   // Resolve Tag
   const tag = tags.find(t => t.id === todo.tagId);
   const colorScheme = tag ? COLOR_PALETTE[tag.color] : null;
@@ -51,6 +58,7 @@ const TodoItem: React.FC<TodoItemProps> = ({
   const hasDescription = todo.description && todo.description.trim().length > 0;
   const subtaskCount = todo.subtasks?.length || 0;
   const completedSubtasks = todo.subtasks?.filter(st => st.completed).length || 0;
+  const hasEstimate = todo.estimatedTime && todo.estimatedTime > 0;
 
   return (
     <div 
@@ -113,6 +121,19 @@ const TodoItem: React.FC<TodoItemProps> = ({
         </span>
         
         <div className="flex flex-wrap items-center gap-2">
+            {hasEstimate && (
+               <span className={`
+                 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border
+                 ${todo.completed 
+                    ? 'bg-gray-100 text-gray-400 border-gray-200' 
+                    : 'bg-violet-50 text-violet-700 border-violet-200'
+                 }
+               `}>
+                 <ClockIcon className="w-3 h-3" />
+                 {formatDuration(todo.estimatedTime!)}
+               </span>
+            )}
+
             {tag && colorScheme && (
             <span className={`
                 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border
