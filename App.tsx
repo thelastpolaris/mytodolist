@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Todo, DayOfWeek, DAYS_OF_WEEK, TimeBlock, Tag, COLOR_PALETTE } from './types';
+import { Todo, DayOfWeek, DAYS_OF_WEEK, ALL_COLUMNS, TimeBlock, Tag, COLOR_PALETTE } from './types';
 import { todoService } from './services/todoService';
 import DayColumn from './components/DayColumn';
 import TagManager from './components/TagManager';
 import TodoModal from './components/TodoModal';
-import { ListIcon, CursorArrowRaysIcon, XMarkIcon, TagIcon, CogIcon } from './components/Icons';
+import { ListIcon, CursorArrowRaysIcon, XMarkIcon, TagIcon, CogIcon, ArchiveBoxIcon } from './components/Icons';
 
 const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -309,12 +309,22 @@ const App: React.FC = () => {
 
             <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-hide mask-linear">
               <span className="text-sm text-gray-400 whitespace-nowrap mr-2 hidden sm:inline">Перенести в:</span>
+              
+              <button
+                  onClick={() => handleMoveSelected('Backlog')}
+                  disabled={selectedIds.length === 0}
+                  className="px-3 py-2 rounded-lg bg-white/10 hover:bg-gray-700 hover:text-white text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap flex items-center gap-2"
+                  title="В Бэклог"
+                >
+                  <ArchiveBoxIcon className="w-4 h-4" />
+              </button>
+              
               {shortDays.map(({ full, short }) => (
                 <button
                   key={full}
                   onClick={() => handleMoveSelected(full)}
                   disabled={selectedIds.length === 0}
-                  className="px-3 py-2 rounded-lg bg-white/10 hover:bg-indigo-50 hover:text-white text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="px-3 py-2 rounded-lg bg-white/10 hover:bg-indigo-50 hover:text-indigo-700 hover:bg-opacity-100 text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {short}
                 </button>
@@ -340,8 +350,9 @@ const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-            {DAYS_OF_WEEK.map((day) => (
+          <div className="flex overflow-x-auto pb-8 gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:overflow-visible">
+             {/* Render Backlog + Days using ALL_COLUMNS */}
+            {ALL_COLUMNS.map((day) => (
               <DayColumn
                 key={day}
                 day={day}

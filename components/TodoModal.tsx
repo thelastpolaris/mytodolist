@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Todo, Tag, Subtask, DayOfWeek, DAYS_OF_WEEK, TimeBlock, COLOR_PALETTE } from '../types';
+import { Todo, Tag, Subtask, DayOfWeek, DAYS_OF_WEEK, TimeBlock, COLOR_PALETTE, ALL_COLUMNS } from '../types';
 import { 
   XMarkIcon, TrashIcon, CheckIcon, ChatBubbleLeftIcon, 
   ListBulletIcon, CalendarIcon, ClockIcon, TagIcon, 
-  PlusIcon, MorningIcon, SunIcon, MoonIcon 
+  PlusIcon, MorningIcon, SunIcon, MoonIcon, ArchiveBoxIcon
 } from './Icons';
 
 interface TodoModalProps {
@@ -181,6 +181,21 @@ const TodoModal: React.FC<TodoModalProps> = ({ todo, tags, onClose, onSave, onDe
                 <CalendarIcon className="w-4 h-4" /> День недели
               </label>
               <div className="grid grid-cols-2 gap-2">
+                {/* Backlog Option */}
+                <button
+                    onClick={() => setDay('Backlog')}
+                    className={`
+                      col-span-2 px-3 py-2 text-sm rounded-lg text-left transition-all border flex items-center gap-2
+                      ${day === 'Backlog' 
+                        ? 'bg-gray-700 border-gray-700 text-white shadow-sm' 
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                      }
+                    `}
+                  >
+                   <ArchiveBoxIcon className="w-4 h-4" />
+                   Бэклог (Нераспределенное)
+                </button>
+
                 {DAYS_OF_WEEK.map(d => (
                   <button
                     key={d}
@@ -199,36 +214,38 @@ const TodoModal: React.FC<TodoModalProps> = ({ todo, tags, onClose, onSave, onDe
               </div>
             </div>
 
-            {/* Time Block Selector */}
-            <div>
-              <label className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                <ClockIcon className="w-4 h-4" /> Время
-              </label>
-              <div className="flex flex-col gap-2">
-                {[
-                  { id: 'morning', label: 'Утро', icon: MorningIcon, color: 'text-amber-600' },
-                  { id: 'day', label: 'День', icon: SunIcon, color: 'text-sky-600' },
-                  { id: 'evening', label: 'Вечер', icon: MoonIcon, color: 'text-indigo-600' },
-                ].map(block => (
-                  <button
-                    key={block.id}
-                    onClick={() => setTimeBlock(block.id as TimeBlock)}
-                    className={`
-                      flex items-center gap-3 px-3 py-2 rounded-lg border transition-all
-                      ${timeBlock === block.id 
-                        ? 'bg-white border-indigo-500 shadow-sm ring-1 ring-indigo-500' 
-                        : 'bg-white border-gray-200 hover:border-gray-300'
-                      }
-                    `}
-                  >
-                    <block.icon className={`w-5 h-5 ${block.color}`} />
-                    <span className={`text-sm font-medium ${timeBlock === block.id ? 'text-gray-900' : 'text-gray-600'}`}>
-                      {block.label}
-                    </span>
-                  </button>
-                ))}
+            {/* Time Block Selector - Hide if Backlog */}
+            {day !== 'Backlog' && (
+              <div>
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                  <ClockIcon className="w-4 h-4" /> Время
+                </label>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { id: 'morning', label: 'Утро', icon: MorningIcon, color: 'text-amber-600' },
+                    { id: 'day', label: 'День', icon: SunIcon, color: 'text-sky-600' },
+                    { id: 'evening', label: 'Вечер', icon: MoonIcon, color: 'text-indigo-600' },
+                  ].map(block => (
+                    <button
+                      key={block.id}
+                      onClick={() => setTimeBlock(block.id as TimeBlock)}
+                      className={`
+                        flex items-center gap-3 px-3 py-2 rounded-lg border transition-all
+                        ${timeBlock === block.id 
+                          ? 'bg-white border-indigo-500 shadow-sm ring-1 ring-indigo-500' 
+                          : 'bg-white border-gray-200 hover:border-gray-300'
+                        }
+                      `}
+                    >
+                      <block.icon className={`w-5 h-5 ${block.color}`} />
+                      <span className={`text-sm font-medium ${timeBlock === block.id ? 'text-gray-900' : 'text-gray-600'}`}>
+                        {block.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Tag Selector */}
             <div>

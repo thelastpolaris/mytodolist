@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { DayOfWeek, Todo, DAYS_OF_WEEK, TimeBlock, Tag, COLOR_PALETTE } from '../types';
+import { DayOfWeek, Todo, DAYS_OF_WEEK, ALL_COLUMNS, TimeBlock, Tag, COLOR_PALETTE } from '../types';
 import TodoItem from './TodoItem';
-import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon, MorningIcon, SunIcon, MoonIcon } from './Icons';
+import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon, MorningIcon, SunIcon, MoonIcon, ArchiveBoxIcon } from './Icons';
 
 interface DayColumnProps {
   day: DayOfWeek;
@@ -39,6 +39,8 @@ const DayColumn: React.FC<DayColumnProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const isBacklog = day === 'Backlog';
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -86,7 +88,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
   };
 
   // Calculate days for submenu
-  const otherDays = DAYS_OF_WEEK.filter(d => d !== day);
+  const otherDays = ALL_COLUMNS.filter(d => d !== day);
   const activeTodosCount = todos.filter(t => !t.completed).length;
 
   const isToday = day === new Date().toLocaleDateString('ru-RU', { weekday: 'long' }).replace(/^./, str => str.toUpperCase());
@@ -135,22 +137,27 @@ const DayColumn: React.FC<DayColumnProps> = ({
   return (
     <div 
       className={`
-        flex flex-col h-full rounded-xl shadow-sm border overflow-visible transition-colors duration-200 relative
+        flex flex-col h-full rounded-xl shadow-sm border overflow-visible transition-colors duration-200 relative min-w-[300px]
         ${isDragOver ? 'bg-indigo-50 border-indigo-300 border-dashed' : 'bg-white border-gray-100'}
         ${isToday && !isDragOver ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}
+        ${isBacklog && !isDragOver ? 'bg-gray-50/50' : ''}
       `}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {/* Header */}
-      <div className={`p-3 border-b border-gray-100 flex justify-between items-center rounded-t-xl ${isWeekend ? 'bg-red-50/50' : 'bg-gray-50/50'}`}>
+      <div className={`
+        p-3 border-b border-gray-100 flex justify-between items-center rounded-t-xl
+        ${isBacklog ? 'bg-gray-100' : isWeekend ? 'bg-red-50/50' : 'bg-gray-50/50'}
+      `}>
         <div className="flex items-center gap-2">
-            <h3 className={`font-bold text-lg ${isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
-            {day}
+            {isBacklog && <ArchiveBoxIcon className="w-5 h-5 text-gray-500" />}
+            <h3 className={`font-bold text-lg ${isBacklog ? 'text-gray-600' : isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
+              {isBacklog ? 'Бэклог' : day}
             </h3>
             <span className="bg-white px-2 py-0.5 rounded-md text-xs font-medium text-gray-400 border border-gray-100 shadow-sm">
-            {todos.length}
+              {todos.length}
             </span>
         </div>
         
@@ -177,7 +184,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
                                     className="w-full text-left px-2 py-1.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-md flex items-center gap-2 transition-colors"
                                 >
                                     <ArrowRightIcon className="w-4 h-4 text-gray-400" />
-                                    <span>В {targetDay}</span>
+                                    <span>В {targetDay === 'Backlog' ? 'Бэклог' : targetDay}</span>
                                 </button>
                             ))}
                         </div>
@@ -190,11 +197,31 @@ const DayColumn: React.FC<DayColumnProps> = ({
       {/* List */}
       <div className="flex-1 p-3 min-h-[150px] flex flex-col">
         {todos.length > 0 ? (
-          <>
-            {renderTodoGroup(morningTodos, 'Утро', <MorningIcon className="w-3.5 h-3.5" />, 'text-amber-600')}
-            {renderTodoGroup(dayTodos, 'День', <SunIcon className="w-3.5 h-3.5" />, 'text-sky-600')}
-            {renderTodoGroup(eveningTodos, 'Вечер', <MoonIcon className="w-3.5 h-3.5" />, 'text-indigo-600')}
-          </>
+          isBacklog ? (
+             // Backlog view: Simple list without time separation
+             <div className="space-y-2">
+               {todos.map(todo => (
+                 <TodoItem 
+                    key={todo.id} 
+                    todo={todo} 
+                    tags={tags}
+                    onToggle={onToggleTodo} 
+                    onDelete={onDeleteTodo}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedIds.includes(todo.id)}
+                    onSelect={onSelectTodo}
+                    onEdit={onEditTodo}
+                  />
+               ))}
+             </div>
+          ) : (
+            // Standard view: Time blocks
+            <>
+              {renderTodoGroup(morningTodos, 'Утро', <MorningIcon className="w-3.5 h-3.5" />, 'text-amber-600')}
+              {renderTodoGroup(dayTodos, 'День', <SunIcon className="w-3.5 h-3.5" />, 'text-sky-600')}
+              {renderTodoGroup(eveningTodos, 'Вечер', <MoonIcon className="w-3.5 h-3.5" />, 'text-indigo-600')}
+            </>
+          )
         ) : (
           <div className={`flex-1 flex flex-col items-center justify-center text-sm py-8 border-2 border-dashed rounded-lg transition-colors ${isDragOver ? 'border-indigo-200 bg-indigo-50/50' : 'border-gray-100 text-gray-300'}`}>
             <p>{isDragOver ? 'Бросьте сюда' : 'Нет задач'}</p>
@@ -206,15 +233,17 @@ const DayColumn: React.FC<DayColumnProps> = ({
       {!isSelectionMode && (
         <form onSubmit={handleSubmit} className="p-3 bg-gray-50 border-t border-gray-100 rounded-b-xl mt-auto">
             
-            {/* Active Selection Indicator (User Requested) */}
+            {/* Active Selection Indicator */}
             <div className="flex items-center justify-between mb-2 px-0.5 min-h-[20px]">
                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="font-medium">
-                    {selectedTimeBlock === 'morning' ? 'Утро' : selectedTimeBlock === 'day' ? 'День' : 'Вечер'}
-                  </span>
+                  {!isBacklog && (
+                    <span className="font-medium">
+                      {selectedTimeBlock === 'morning' ? 'Утро' : selectedTimeBlock === 'day' ? 'День' : 'Вечер'}
+                    </span>
+                  )}
                   {activeTag && (
                      <>
-                      <span>•</span>
+                      {!isBacklog && <span>•</span>}
                       <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${COLOR_PALETTE[activeTag.color].bg} ${COLOR_PALETTE[activeTag.color].border} ${COLOR_PALETTE[activeTag.color].text}`}>
                         {activeTag.label}
                       </span>
@@ -225,35 +254,38 @@ const DayColumn: React.FC<DayColumnProps> = ({
 
             {/* Controls Row */}
             <div className="flex items-center gap-2 mb-2 px-1">
-              {/* Time Block Selector */}
-              <div className="flex bg-gray-200 p-0.5 rounded-lg gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedTimeBlock('morning')}
-                  className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'morning' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  title="Утро"
-                >
-                  <MorningIcon className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTimeBlock('day')}
-                  className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'day' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  title="День"
-                >
-                  <SunIcon className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTimeBlock('evening')}
-                  className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'evening' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  title="Вечер"
-                >
-                  <MoonIcon className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="w-px h-6 bg-gray-200"></div>
+              {/* Time Block Selector - Hide in Backlog */}
+              {!isBacklog && (
+                <>
+                  <div className="flex bg-gray-200 p-0.5 rounded-lg gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTimeBlock('morning')}
+                      className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'morning' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                      title="Утро"
+                    >
+                      <MorningIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTimeBlock('day')}
+                      className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'day' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                      title="День"
+                    >
+                      <SunIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTimeBlock('evening')}
+                      className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'evening' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                      title="Вечер"
+                    >
+                      <MoonIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="w-px h-6 bg-gray-200"></div>
+                </>
+              )}
 
               {/* Tag Selector (Compact) */}
               <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide mask-linear-right">
@@ -282,7 +314,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Новая задача..."
+                  placeholder={isBacklog ? "Задача в бэклог..." : "Новая задача..."}
                   className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-400"
               />
               <button 

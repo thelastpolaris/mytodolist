@@ -1,5 +1,5 @@
 
-export type DayOfWeek = 'Понедельник' | 'Вторник' | 'Среда' | 'Четверг' | 'Пятница' | 'Суббота' | 'Воскресенье';
+export type DayOfWeek = 'Backlog' | 'Понедельник' | 'Вторник' | 'Среда' | 'Четверг' | 'Пятница' | 'Суббота' | 'Воскресенье';
 
 export const DAYS_OF_WEEK: DayOfWeek[] = [
   'Понедельник',
@@ -9,6 +9,11 @@ export const DAYS_OF_WEEK: DayOfWeek[] = [
   'Пятница',
   'Суббота',
   'Воскресенье'
+];
+
+export const ALL_COLUMNS: DayOfWeek[] = [
+  'Backlog',
+  ...DAYS_OF_WEEK
 ];
 
 export type TimeBlock = 'morning' | 'day' | 'evening';
@@ -76,10 +81,4 @@ export enum FilterType {
   ALL = 'ALL',
   ACTIVE = 'ACTIVE',
   COMPLETED = 'COMPLETED'
-}
-
-export interface TodoStats {
-  total: number;
-  active: number;
-  completed: number;
 }
