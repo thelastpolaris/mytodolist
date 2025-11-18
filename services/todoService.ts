@@ -1,4 +1,4 @@
-import { Todo } from '../types';
+import { Todo, DayOfWeek, DAYS_OF_WEEK } from '../types';
 
 const STORAGE_KEY = 'todo_app_v1_data';
 
@@ -10,28 +10,37 @@ const generateId = (): string => {
 export const todoService = {
   /**
    * Fetches all todos.
-   * In the future, replace this with an API GET request.
    */
   getAll: (): Promise<Todo[]> => {
     return new Promise((resolve) => {
       const data = localStorage.getItem(STORAGE_KEY);
-      const todos: Todo[] = data ? JSON.parse(data) : [];
-      // Simulate network delay for realism if desired, keeping it sync for MVP speed
+      let todos: Todo[] = data ? JSON.parse(data) : [];
+      
+      // Migration for existing data without 'day' property
+      // Assign them to today or Monday if specific logic is needed
+      const todayIndex = (new Date().getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+      const todayName = DAYS_OF_WEEK[todayIndex];
+
+      todos = todos.map(todo => ({
+        ...todo,
+        day: todo.day || todayName // Fallback for old data
+      }));
+
       resolve(todos.sort((a, b) => b.createdAt - a.createdAt));
     });
   },
 
   /**
-   * Adds a new todo.
-   * In the future, replace with API POST request.
+   * Adds a new todo for a specific day.
    */
-  add: (text: string): Promise<Todo> => {
+  add: (text: string, day: DayOfWeek): Promise<Todo> => {
     return new Promise((resolve) => {
       const newTodo: Todo = {
         id: generateId(),
         text,
         completed: false,
         createdAt: Date.now(),
+        day,
       };
       
       const data = localStorage.getItem(STORAGE_KEY);
@@ -45,7 +54,6 @@ export const todoService = {
 
   /**
    * Toggles completion status.
-   * In the future, replace with API PUT/PATCH request.
    */
   toggle: (id: string): Promise<void> => {
     return new Promise((resolve) => {
@@ -64,7 +72,6 @@ export const todoService = {
 
   /**
    * Deletes a todo.
-   * In the future, replace with API DELETE request.
    */
   delete: (id: string): Promise<void> => {
     return new Promise((resolve) => {
@@ -73,6 +80,42 @@ export const todoService = {
 
       const currentTodos: Todo[] = JSON.parse(data);
       const updatedTodos = currentTodos.filter(todo => todo.id !== id);
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedTodos));
+      resolve();
+    });
+  },
+
+  /**
+   * Updates the day of a specific todo.
+   */
+  updateDay: (id: string, newDay: DayOfWeek): Promise<void> => {
+    return new Promise((resolve) => {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) return resolve();
+
+      const currentTodos: Todo[] = JSON.parse(data);
+      const updatedTodos = currentTodos.map(todo => 
+        todo.id === id ? { ...todo, day: newDay } : todo
+      );
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedTodos));
+      resolve();
+    });
+  },
+
+  /**
+   * Moves multiple todos to a new day.
+   */
+  moveBatch: (ids: string[], newDay: DayOfWeek): Promise<void> => {
+    return new Promise((resolve) => {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) return resolve();
+
+      const currentTodos: Todo[] = JSON.parse(data);
+      const updatedTodos = currentTodos.map(todo => 
+        ids.includes(todo.id) ? { ...todo, day: newDay } : todo
+      );
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedTodos));
       resolve();
