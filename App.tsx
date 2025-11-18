@@ -5,7 +5,7 @@ import { todoService } from './services/todoService';
 import DayColumn from './components/DayColumn';
 import TagManager from './components/TagManager';
 import TodoModal from './components/TodoModal';
-import { ListIcon, CursorArrowRaysIcon, XMarkIcon, TagIcon, CogIcon, ArchiveBoxIcon } from './components/Icons';
+import { ListIcon, CursorArrowRaysIcon, XMarkIcon, TagIcon, CogIcon, ArchiveBoxIcon, ArrowsPointingInIcon } from './components/Icons';
 
 const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [activeTagFilterId, setActiveTagFilterId] = useState<string | 'all'>('all');
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
+  const [focusedDay, setFocusedDay] = useState<DayOfWeek | null>(null);
 
   // Initial Data Load
   useEffect(() => {
@@ -180,6 +181,20 @@ const App: React.FC = () => {
     todos.find(t => t.id === editingTodoId), 
     [todos, editingTodoId]
   );
+
+  const getShortName = (day: string) => {
+    const map: Record<string, string> = {
+      'Backlog': 'Бэклог',
+      'Понедельник': 'ПН',
+      'Вторник': 'ВТ',
+      'Среда': 'СР',
+      'Четверг': 'ЧТ',
+      'Пятница': 'ПТ',
+      'Суббота': 'СБ',
+      'Воскресенье': 'ВС',
+    };
+    return map[day] || day.substring(0, 2);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-24">
@@ -358,26 +373,88 @@ const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="flex overflow-x-auto pb-8 gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:overflow-visible">
-             {/* Render Backlog + Days using ALL_COLUMNS */}
-            {ALL_COLUMNS.map((day) => (
-              <DayColumn
-                key={day}
-                day={day}
-                todos={filteredTodos.filter(t => t.day === day)}
-                tags={tags}
-                onAddTodo={handleAddTodo}
-                onToggleTodo={handleToggleTodo}
-                onDeleteTodo={handleDeleteTodo}
-                onDropTodo={handleDropTodo}
-                onMoveAll={handleMoveAll}
-                isSelectionMode={isSelectionMode}
-                selectedIds={selectedIds}
-                onSelectTodo={handleSelectTodo}
-                onEditTodo={(todo) => setEditingTodoId(todo.id)}
-              />
-            ))}
-          </div>
+          <>
+            {focusedDay ? (
+               // Focused Single Column View
+               <div className="max-w-3xl mx-auto animate-in fade-in zoom-in-95 duration-300">
+                 {/* Focused Navigation */}
+                 <div className="flex items-center justify-between mb-6 bg-white p-2 rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+                    <button 
+                      onClick={() => setFocusedDay(null)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors"
+                    >
+                      <ArrowsPointingInIcon className="w-4 h-4" />
+                      <span className="hidden sm:inline">Обзор</span>
+                    </button>
+                    
+                    <div className="w-px h-6 bg-gray-200 mx-2 flex-shrink-0"></div>
+                    
+                    <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+                      {ALL_COLUMNS.map(day => {
+                         const isSelected = focusedDay === day;
+                         const isBacklog = day === 'Backlog';
+                         return (
+                            <button
+                              key={day}
+                              onClick={() => setFocusedDay(day)}
+                              className={`
+                                px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex-shrink-0
+                                ${isSelected 
+                                  ? 'bg-indigo-600 text-white shadow-md' 
+                                  : 'text-gray-500 hover:bg-gray-50'
+                                }
+                              `}
+                            >
+                               {isBacklog ? <ArchiveBoxIcon className="w-4 h-4" /> : getShortName(day)}
+                            </button>
+                         );
+                      })}
+                    </div>
+                 </div>
+
+                 {/* Single Focused Column */}
+                 <DayColumn
+                    day={focusedDay}
+                    todos={filteredTodos.filter(t => t.day === focusedDay)}
+                    tags={tags}
+                    onAddTodo={handleAddTodo}
+                    onToggleTodo={handleToggleTodo}
+                    onDeleteTodo={handleDeleteTodo}
+                    onDropTodo={handleDropTodo}
+                    onMoveAll={handleMoveAll}
+                    isSelectionMode={isSelectionMode}
+                    selectedIds={selectedIds}
+                    onSelectTodo={handleSelectTodo}
+                    onEditTodo={(todo) => setEditingTodoId(todo.id)}
+                    onFocus={() => {}} // Already focused
+                    isFocused={true}
+                 />
+               </div>
+            ) : (
+              // Overview Grid View
+              <div className="flex overflow-x-auto pb-8 gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:overflow-visible animate-in fade-in duration-300">
+                {ALL_COLUMNS.map((day) => (
+                  <DayColumn
+                    key={day}
+                    day={day}
+                    todos={filteredTodos.filter(t => t.day === day)}
+                    tags={tags}
+                    onAddTodo={handleAddTodo}
+                    onToggleTodo={handleToggleTodo}
+                    onDeleteTodo={handleDeleteTodo}
+                    onDropTodo={handleDropTodo}
+                    onMoveAll={handleMoveAll}
+                    isSelectionMode={isSelectionMode}
+                    selectedIds={selectedIds}
+                    onSelectTodo={handleSelectTodo}
+                    onEditTodo={(todo) => setEditingTodoId(todo.id)}
+                    onFocus={() => setFocusedDay(day)}
+                    isFocused={false}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DayOfWeek, Todo, DAYS_OF_WEEK, ALL_COLUMNS, TimeBlock, Tag, COLOR_PALETTE } from '../types';
 import TodoItem from './TodoItem';
-import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon, MorningIcon, SunIcon, MoonIcon, ArchiveBoxIcon } from './Icons';
+import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon, MorningIcon, SunIcon, MoonIcon, ArchiveBoxIcon, ArrowsPointingOutIcon } from './Icons';
 
 interface DayColumnProps {
   day: DayOfWeek;
@@ -17,6 +17,8 @@ interface DayColumnProps {
   selectedIds: string[];
   onSelectTodo: (id: string) => void;
   onEditTodo: (todo: Todo) => void;
+  onFocus: () => void;
+  isFocused: boolean;
 }
 
 const DayColumn: React.FC<DayColumnProps> = ({ 
@@ -31,7 +33,9 @@ const DayColumn: React.FC<DayColumnProps> = ({
   isSelectionMode,
   selectedIds,
   onSelectTodo,
-  onEditTodo
+  onEditTodo,
+  onFocus,
+  isFocused
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock>('day');
@@ -137,10 +141,11 @@ const DayColumn: React.FC<DayColumnProps> = ({
   return (
     <div 
       className={`
-        flex flex-col h-full rounded-xl shadow-sm border overflow-visible transition-colors duration-200 relative min-w-[300px]
+        flex flex-col h-full rounded-xl shadow-sm border overflow-visible transition-colors duration-200 relative
+        ${isFocused ? 'w-full max-w-3xl mx-auto min-h-[80vh] shadow-md bg-white' : 'min-w-[300px]'}
         ${isDragOver ? 'bg-indigo-50 border-indigo-300 border-dashed' : 'bg-white border-gray-100'}
-        ${isToday && !isDragOver ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}
-        ${isBacklog && !isDragOver ? 'bg-gray-50/50' : ''}
+        ${isToday && !isDragOver && !isFocused ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}
+        ${isBacklog && !isDragOver && !isFocused ? 'bg-gray-50/50' : ''}
       `}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -149,11 +154,12 @@ const DayColumn: React.FC<DayColumnProps> = ({
       {/* Header */}
       <div className={`
         p-3 border-b border-gray-100 flex justify-between items-center rounded-t-xl
-        ${isBacklog ? 'bg-gray-100' : isWeekend ? 'bg-red-50/50' : 'bg-gray-50/50'}
+        ${isFocused ? 'bg-white py-4' : ''}
+        ${!isFocused && isBacklog ? 'bg-gray-100' : !isFocused && isWeekend ? 'bg-red-50/50' : !isFocused ? 'bg-gray-50/50' : ''}
       `}>
         <div className="flex items-center gap-2">
             {isBacklog && <ArchiveBoxIcon className="w-5 h-5 text-gray-500" />}
-            <h3 className={`font-bold text-lg ${isBacklog ? 'text-gray-600' : isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
+            <h3 className={`font-bold text-lg ${!isFocused && isBacklog ? 'text-gray-600' : !isFocused && isWeekend ? 'text-red-500' : 'text-gray-700'}`}>
               {isBacklog ? 'Бэклог' : day}
             </h3>
             <span className="bg-white px-2 py-0.5 rounded-md text-xs font-medium text-gray-400 border border-gray-100 shadow-sm">
@@ -161,37 +167,50 @@ const DayColumn: React.FC<DayColumnProps> = ({
             </span>
         </div>
         
-        {/* Context Menu */}
-        {!isSelectionMode && todos.length > 0 && (
-            <div className="relative" ref={menuRef}>
-                <button 
-                    onClick={() => setShowMenu(!showMenu)}
-                    className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all"
-                >
-                    <DotsHorizontalIcon className="w-5 h-5" />
-                </button>
+        <div className="flex items-center gap-1">
+          {/* Focus Button - Only show if not already focused and not selecting */}
+          {!isSelectionMode && !isFocused && (
+             <button
+               onClick={onFocus}
+               className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all"
+               title="Фокусировка на этом дне"
+             >
+               <ArrowsPointingOutIcon className="w-5 h-5" />
+             </button>
+          )}
 
-                {showMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 z-50 p-1 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                        <div className="text-xs font-semibold text-gray-400 px-2 py-1.5 uppercase tracking-wider">
-                            Перенести активные ({activeTodosCount})
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
-                            {otherDays.map(targetDay => (
-                                <button
-                                    key={targetDay}
-                                    onClick={() => handleMoveAllTo(targetDay)}
-                                    className="w-full text-left px-2 py-1.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-md flex items-center gap-2 transition-colors"
-                                >
-                                    <ArrowRightIcon className="w-4 h-4 text-gray-400" />
-                                    <span>В {targetDay === 'Backlog' ? 'Бэклог' : targetDay}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        )}
+          {/* Context Menu */}
+          {!isSelectionMode && todos.length > 0 && (
+              <div className="relative" ref={menuRef}>
+                  <button 
+                      onClick={() => setShowMenu(!showMenu)}
+                      className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-all"
+                  >
+                      <DotsHorizontalIcon className="w-5 h-5" />
+                  </button>
+
+                  {showMenu && (
+                      <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-xl border border-gray-100 z-50 p-1 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                          <div className="text-xs font-semibold text-gray-400 px-2 py-1.5 uppercase tracking-wider">
+                              Перенести активные ({activeTodosCount})
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                              {otherDays.map(targetDay => (
+                                  <button
+                                      key={targetDay}
+                                      onClick={() => handleMoveAllTo(targetDay)}
+                                      className="w-full text-left px-2 py-1.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-md flex items-center gap-2 transition-colors"
+                                  >
+                                      <ArrowRightIcon className="w-4 h-4 text-gray-400" />
+                                      <span>В {targetDay === 'Backlog' ? 'Бэклог' : targetDay}</span>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
+              </div>
+          )}
+        </div>
       </div>
 
       {/* List */}
@@ -231,7 +250,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
 
       {/* Input & Time/Tag Selector */}
       {!isSelectionMode && (
-        <form onSubmit={handleSubmit} className="p-3 bg-gray-50 border-t border-gray-100 rounded-b-xl mt-auto">
+        <form onSubmit={handleSubmit} className={`p-3 bg-gray-50 border-t border-gray-100 rounded-b-xl mt-auto ${isFocused ? 'bg-white' : ''}`}>
             
             {/* Active Selection Indicator */}
             <div className="flex items-center justify-between mb-2 px-0.5 min-h-[20px]">
