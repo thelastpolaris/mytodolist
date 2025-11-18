@@ -1,34 +1,47 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Todo, DayOfWeek, DAYS_OF_WEEK } from './types';
+import { Todo, DayOfWeek, DAYS_OF_WEEK, TimeBlock, Tag, COLOR_PALETTE } from './types';
 import { todoService } from './services/todoService';
 import DayColumn from './components/DayColumn';
-import { ListIcon } from './components/Icons';
+import TagManager from './components/TagManager';
+import TodoModal from './components/TodoModal';
+import { ListIcon, CursorArrowRaysIcon, XMarkIcon, TagIcon, CogIcon } from './components/Icons';
 
 const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeTagFilterId, setActiveTagFilterId] = useState<string | 'all'>('all');
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
 
   // Initial Data Load
   useEffect(() => {
-    const fetchTodos = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       try {
-        const data = await todoService.getAll();
-        setTodos(data);
+        const [loadedTodos, loadedTags] = await Promise.all([
+          todoService.getAll(),
+          todoService.getTags()
+        ]);
+        setTodos(loadedTodos);
+        setTags(loadedTags);
       } catch (error) {
-        console.error('Failed to fetch todos', error);
+        console.error('Failed to fetch data', error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchTodos();
+    fetchData();
   }, []);
 
   // Handlers
-  const handleAddTodo = async (text: string, day: DayOfWeek) => {
+  const handleAddTodo = async (text: string, day: DayOfWeek, timeBlock: TimeBlock, tagId: string | null) => {
     try {
-      const newTodo = await todoService.add(text, day);
-      setTodos(prev => [...prev, newTodo]); // Append to end for cleaner UI in columns
+      const newTodo = await todoService.add(text, day, timeBlock, tagId);
+      setTodos(prev => [...prev, newTodo]); 
     } catch (error) {
       console.error('Error adding todo', error);
     }
@@ -54,12 +67,19 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateTodo = async (updatedTodo: Todo) => {
+    try {
+      await todoService.update(updatedTodo);
+      setTodos(prev => prev.map(t => t.id === updatedTodo.id ? updatedTodo : t));
+    } catch (error) {
+      console.error('Error updating todo', error);
+    }
+  };
+
   const handleDropTodo = async (todoId: string, targetDay: DayOfWeek) => {
-    // Check if todo is already in that day to prevent unnecessary updates
     const todo = todos.find(t => t.id === todoId);
     if (!todo || todo.day === targetDay) return;
 
-    // Optimistic update for UI responsiveness
     setTodos(prev => prev.map(t => 
       t.id === todoId ? { ...t, day: targetDay } : t
     ));
@@ -68,18 +88,14 @@ const App: React.FC = () => {
       await todoService.updateDay(todoId, targetDay);
     } catch (error) {
       console.error('Error moving todo', error);
-      // Revert on error would go here
     }
   };
 
   const handleMoveAll = async (sourceDay: DayOfWeek, targetDay: DayOfWeek) => {
-    // Find all active todos in source day
     const todosToMove = todos.filter(t => t.day === sourceDay && !t.completed);
     if (todosToMove.length === 0) return;
-
     const idsToMove = todosToMove.map(t => t.id);
 
-    // Optimistic update
     setTodos(prev => prev.map(t => 
       idsToMove.includes(t.id) ? { ...t, day: targetDay } : t
     ));
@@ -91,6 +107,54 @@ const App: React.FC = () => {
     }
   };
 
+  // Selection Mode Handlers
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(prev => !prev);
+    setSelectedIds([]); // Reset selection when toggling
+  };
+
+  const handleSelectTodo = (id: string) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(item => item !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleMoveSelected = async (targetDay: DayOfWeek) => {
+    if (selectedIds.length === 0) return;
+
+    setTodos(prev => prev.map(t => 
+      selectedIds.includes(t.id) ? { ...t, day: targetDay } : t
+    ));
+
+    try {
+      await todoService.moveBatch(selectedIds, targetDay);
+      setSelectedIds([]);
+      setIsSelectionMode(false);
+    } catch (error) {
+      console.error('Error moving selected todos', error);
+    }
+  };
+
+  // Tag Management
+  const handleSaveTags = async (newTags: Tag[]) => {
+    try {
+      await todoService.saveTags(newTags);
+      setTags(newTags);
+    } catch (error) {
+      console.error('Failed to save tags', error);
+    }
+  };
+
+  // Filtering
+  const filteredTodos = useMemo(() => {
+    if (activeTagFilterId === 'all') return todos;
+    return todos.filter(todo => todo.tagId === activeTagFilterId);
+  }, [todos, activeTagFilterId]);
+
   // Stats
   const stats = useMemo(() => ({
     total: todos.length,
@@ -99,32 +163,173 @@ const App: React.FC = () => {
 
   const progress = stats.total === 0 ? 0 : Math.round((stats.completed / stats.total) * 100);
 
+  const shortDays = DAYS_OF_WEEK.map(day => ({
+    full: day,
+    short: day.substring(0, 2).toUpperCase()
+  }));
+
+  const editingTodo = useMemo(() => 
+    todos.find(t => t.id === editingTodoId), 
+    [todos, editingTodoId]
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-24">
+      {isTagManagerOpen && (
+        <TagManager 
+          tags={tags} 
+          onSaveTags={handleSaveTags} 
+          onClose={() => setIsTagManagerOpen(false)} 
+        />
+      )}
+
+      {editingTodo && (
+        <TodoModal
+          todo={editingTodo}
+          tags={tags}
+          onClose={() => setEditingTodoId(null)}
+          onSave={handleUpdateTodo}
+          onDelete={handleDeleteTodo}
+        />
+      )}
+
       {/* Top Navigation / Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-sm shadow-indigo-200">
-              <ListIcon className="w-5 h-5" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Top Row: Title and Global Actions */}
+          <div className="h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-sm shadow-indigo-200">
+                <ListIcon className="w-5 h-5" />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-gray-800 hidden sm:block">Моя Неделя</h1>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-gray-800">Моя Неделя</h1>
+            
+            <div className="flex items-center gap-4">
+              {/* Selection Mode Toggle */}
+              <button
+                onClick={toggleSelectionMode}
+                className={`
+                  flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${isSelectionMode 
+                    ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500 ring-offset-1' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }
+                `}
+              >
+                <CursorArrowRaysIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">{isSelectionMode ? 'Готово' : 'Выбрать'}</span>
+              </button>
+
+              {/* Progress Bar */}
+              <div className="hidden md:flex items-center gap-4">
+                <div className="text-sm text-gray-500">
+                  <span className="font-medium text-indigo-600">{stats.completed}</span> / {stats.total} выполнено
+                </div>
+                <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden ring-1 ring-gray-100">
+                  <div 
+                    className="h-full bg-indigo-500 transition-all duration-500 rounded-full"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-          
-          {/* Simple Progress Bar */}
-          <div className="flex items-center gap-4">
-             <div className="hidden sm:block text-sm text-gray-500">
-               <span className="font-medium text-indigo-600">{stats.completed}</span> / {stats.total} выполнено
-             </div>
-             <div className="w-24 sm:w-32 h-2 bg-gray-100 rounded-full overflow-hidden ring-1 ring-gray-100">
-               <div 
-                 className="h-full bg-indigo-500 transition-all duration-500 rounded-full"
-                 style={{ width: `${progress}%` }}
-               />
-             </div>
+
+          {/* Bottom Row: Filters */}
+          <div className="pb-3 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mr-1 flex items-center gap-1">
+                 <TagIcon className="w-3.5 h-3.5" />
+                 Фильтр:
+              </span>
+              
+              <button
+                onClick={() => setActiveTagFilterId('all')}
+                className={`
+                   px-3 py-1 rounded-full text-xs font-medium border transition-all whitespace-nowrap
+                   ${activeTagFilterId === 'all' 
+                     ? 'bg-gray-800 text-white border-gray-800' 
+                     : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                   }
+                `}
+              >
+                Все задачи
+              </button>
+
+              {tags.map(tag => {
+                 const isActive = activeTagFilterId === tag.id;
+                 const colors = COLOR_PALETTE[tag.color];
+                 return (
+                   <button
+                     key={tag.id}
+                     onClick={() => setActiveTagFilterId(isActive ? 'all' : tag.id)}
+                     className={`
+                        px-3 py-1 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 whitespace-nowrap
+                        ${isActive 
+                          ? `${colors.bg} ${colors.text} ${colors.border} ring-1 ring-offset-1 ring-current` 
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        }
+                     `}
+                   >
+                     <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-current' : colors.dot}`}></span>
+                     {tag.label}
+                   </button>
+                 );
+              })}
+            </div>
+
+            <button
+              onClick={() => setIsTagManagerOpen(true)}
+              className="ml-4 p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors flex-shrink-0"
+              title="Настроить теги"
+            >
+              <CogIcon className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Selection Floating Bar */}
+      {isSelectionMode && (
+        <div className="fixed bottom-6 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-auto sm:min-w-[600px] z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="bg-gray-900/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-white/10 flex flex-col sm:flex-row items-center gap-4 justify-between">
+            
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start border-b sm:border-b-0 border-white/10 pb-3 sm:pb-0">
+              <span className="font-semibold whitespace-nowrap pl-1">
+                Выбрано: {selectedIds.length}
+              </span>
+              <button 
+                onClick={toggleSelectionMode}
+                className="p-1 hover:bg-white/20 rounded-full sm:hidden"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-hide mask-linear">
+              <span className="text-sm text-gray-400 whitespace-nowrap mr-2 hidden sm:inline">Перенести в:</span>
+              {shortDays.map(({ full, short }) => (
+                <button
+                  key={full}
+                  onClick={() => handleMoveSelected(full)}
+                  disabled={selectedIds.length === 0}
+                  className="px-3 py-2 rounded-lg bg-white/10 hover:bg-indigo-50 hover:text-white text-sm font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {short}
+                </button>
+              ))}
+            </div>
+
+            <button 
+               onClick={toggleSelectionMode}
+               className="hidden sm:flex p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
+             >
+               <XMarkIcon className="w-5 h-5" />
+             </button>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-[1800px] mx-auto px-2 sm:px-6 lg:px-8 py-8">
         {isLoading ? (
@@ -140,12 +345,17 @@ const App: React.FC = () => {
               <DayColumn
                 key={day}
                 day={day}
-                todos={todos.filter(t => t.day === day)}
+                todos={filteredTodos.filter(t => t.day === day)}
+                tags={tags}
                 onAddTodo={handleAddTodo}
                 onToggleTodo={handleToggleTodo}
                 onDeleteTodo={handleDeleteTodo}
                 onDropTodo={handleDropTodo}
                 onMoveAll={handleMoveAll}
+                isSelectionMode={isSelectionMode}
+                selectedIds={selectedIds}
+                onSelectTodo={handleSelectTodo}
+                onEditTodo={(todo) => setEditingTodoId(todo.id)}
               />
             ))}
           </div>

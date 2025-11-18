@@ -1,28 +1,41 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { DayOfWeek, Todo, DAYS_OF_WEEK } from '../types';
+import { DayOfWeek, Todo, DAYS_OF_WEEK, TimeBlock, Tag, COLOR_PALETTE } from '../types';
 import TodoItem from './TodoItem';
-import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon } from './Icons';
+import { PlusIcon, DotsHorizontalIcon, ArrowRightIcon, MorningIcon, SunIcon, MoonIcon } from './Icons';
 
 interface DayColumnProps {
   day: DayOfWeek;
   todos: Todo[];
-  onAddTodo: (text: string, day: DayOfWeek) => void;
+  tags: Tag[];
+  onAddTodo: (text: string, day: DayOfWeek, timeBlock: TimeBlock, tagId: string | null) => void;
   onToggleTodo: (id: string) => void;
   onDeleteTodo: (id: string) => void;
   onDropTodo: (todoId: string, targetDay: DayOfWeek) => void;
   onMoveAll: (sourceDay: DayOfWeek, targetDay: DayOfWeek) => void;
+  isSelectionMode: boolean;
+  selectedIds: string[];
+  onSelectTodo: (id: string) => void;
+  onEditTodo: (todo: Todo) => void;
 }
 
 const DayColumn: React.FC<DayColumnProps> = ({ 
   day, 
   todos, 
+  tags,
   onAddTodo, 
   onToggleTodo, 
   onDeleteTodo,
   onDropTodo,
-  onMoveAll
+  onMoveAll,
+  isSelectionMode,
+  selectedIds,
+  onSelectTodo,
+  onEditTodo
 }) => {
   const [inputValue, setInputValue] = useState('');
+  const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock>('day');
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,12 +54,13 @@ const DayColumn: React.FC<DayColumnProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputValue.trim()) {
-      onAddTodo(inputValue.trim(), day);
+      onAddTodo(inputValue.trim(), day, selectedTimeBlock, selectedTagId);
       setInputValue('');
     }
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isSelectionMode) return;
     e.preventDefault(); // Necessary to allow dropping
     setIsDragOver(true);
   };
@@ -58,6 +72,8 @@ const DayColumn: React.FC<DayColumnProps> = ({
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
+    if (isSelectionMode) return;
+    
     const todoId = e.dataTransfer.getData('todoId');
     if (todoId) {
       onDropTodo(todoId, day);
@@ -75,6 +91,46 @@ const DayColumn: React.FC<DayColumnProps> = ({
 
   const isToday = day === new Date().toLocaleDateString('ru-RU', { weekday: 'long' }).replace(/^./, str => str.toUpperCase());
   const isWeekend = day === 'Суббота' || day === 'Воскресенье';
+
+  // Group todos by time block
+  const morningTodos = todos.filter(t => t.timeBlock === 'morning');
+  const dayTodos = todos.filter(t => t.timeBlock === 'day');
+  const eveningTodos = todos.filter(t => t.timeBlock === 'evening');
+
+  const renderTodoGroup = (
+    groupTodos: Todo[], 
+    title: string, 
+    icon: React.ReactNode, 
+    colorClass: string
+  ) => {
+    if (groupTodos.length === 0) return null;
+
+    return (
+      <div className="mb-3 last:mb-0">
+        <div className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider mb-2 px-1 ${colorClass}`}>
+          {icon}
+          <span>{title}</span>
+        </div>
+        <div className="space-y-2">
+          {groupTodos.map(todo => (
+            <TodoItem 
+              key={todo.id} 
+              todo={todo} 
+              tags={tags}
+              onToggle={onToggleTodo} 
+              onDelete={onDeleteTodo}
+              isSelectionMode={isSelectionMode}
+              isSelected={selectedIds.includes(todo.id)}
+              onSelect={onSelectTodo}
+              onEdit={onEditTodo}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const activeTag = tags.find(t => t.id === selectedTagId);
 
   return (
     <div 
@@ -99,7 +155,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
         </div>
         
         {/* Context Menu */}
-        {todos.length > 0 && (
+        {!isSelectionMode && todos.length > 0 && (
             <div className="relative" ref={menuRef}>
                 <button 
                     onClick={() => setShowMenu(!showMenu)}
@@ -132,42 +188,113 @@ const DayColumn: React.FC<DayColumnProps> = ({
       </div>
 
       {/* List */}
-      <div className="flex-1 p-3 space-y-2 min-h-[150px]">
+      <div className="flex-1 p-3 min-h-[150px] flex flex-col">
         {todos.length > 0 ? (
-          todos.map(todo => (
-            <TodoItem 
-              key={todo.id} 
-              todo={todo} 
-              onToggle={onToggleTodo} 
-              onDelete={onDeleteTodo} 
-            />
-          ))
+          <>
+            {renderTodoGroup(morningTodos, 'Утро', <MorningIcon className="w-3.5 h-3.5" />, 'text-amber-600')}
+            {renderTodoGroup(dayTodos, 'День', <SunIcon className="w-3.5 h-3.5" />, 'text-sky-600')}
+            {renderTodoGroup(eveningTodos, 'Вечер', <MoonIcon className="w-3.5 h-3.5" />, 'text-indigo-600')}
+          </>
         ) : (
-          <div className={`h-full flex flex-col items-center justify-center text-sm py-8 border-2 border-dashed rounded-lg transition-colors ${isDragOver ? 'border-indigo-200 bg-indigo-50/50' : 'border-gray-100 text-gray-300'}`}>
+          <div className={`flex-1 flex flex-col items-center justify-center text-sm py-8 border-2 border-dashed rounded-lg transition-colors ${isDragOver ? 'border-indigo-200 bg-indigo-50/50' : 'border-gray-100 text-gray-300'}`}>
             <p>{isDragOver ? 'Бросьте сюда' : 'Нет задач'}</p>
           </div>
         )}
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="p-3 bg-gray-50 border-t border-gray-100 rounded-b-xl">
-        <div className="relative">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Добавить..."
-            className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-          />
-          <button 
-            type="submit"
-            disabled={!inputValue.trim()}
-            className="absolute right-1 top-1 p-1 text-indigo-500 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <PlusIcon className="w-5 h-5" />
-          </button>
-        </div>
-      </form>
+      {/* Input & Time/Tag Selector */}
+      {!isSelectionMode && (
+        <form onSubmit={handleSubmit} className="p-3 bg-gray-50 border-t border-gray-100 rounded-b-xl mt-auto">
+            
+            {/* Active Selection Indicator (User Requested) */}
+            <div className="flex items-center justify-between mb-2 px-0.5 min-h-[20px]">
+               <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="font-medium">
+                    {selectedTimeBlock === 'morning' ? 'Утро' : selectedTimeBlock === 'day' ? 'День' : 'Вечер'}
+                  </span>
+                  {activeTag && (
+                     <>
+                      <span>•</span>
+                      <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${COLOR_PALETTE[activeTag.color].bg} ${COLOR_PALETTE[activeTag.color].border} ${COLOR_PALETTE[activeTag.color].text}`}>
+                        {activeTag.label}
+                      </span>
+                     </>
+                  )}
+               </div>
+            </div>
+
+            {/* Controls Row */}
+            <div className="flex items-center gap-2 mb-2 px-1">
+              {/* Time Block Selector */}
+              <div className="flex bg-gray-200 p-0.5 rounded-lg gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTimeBlock('morning')}
+                  className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'morning' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Утро"
+                >
+                  <MorningIcon className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTimeBlock('day')}
+                  className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'day' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="День"
+                >
+                  <SunIcon className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTimeBlock('evening')}
+                  className={`p-1 rounded-md transition-all ${selectedTimeBlock === 'evening' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Вечер"
+                >
+                  <MoonIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="w-px h-6 bg-gray-200"></div>
+
+              {/* Tag Selector (Compact) */}
+              <div className="flex items-center gap-1 flex-1 overflow-x-auto scrollbar-hide mask-linear-right">
+                 {tags.map(tag => {
+                    const colors = COLOR_PALETTE[tag.color];
+                    const isSelected = selectedTagId === tag.id;
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => setSelectedTagId(isSelected ? null : tag.id)}
+                        className={`
+                          w-4 h-4 rounded-full border transition-all flex-shrink-0
+                          ${colors.bg} ${colors.border}
+                          ${isSelected ? 'ring-2 ring-offset-1 ring-indigo-500 scale-110' : 'opacity-60 hover:opacity-100'}
+                        `}
+                        title={tag.label}
+                      />
+                    );
+                 })}
+              </div>
+            </div>
+
+            <div className="relative">
+              <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Новая задача..."
+                  className="w-full pl-3 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-400"
+              />
+              <button 
+                  type="submit"
+                  disabled={!inputValue.trim()}
+                  className="absolute right-1 top-1 p-1 text-indigo-500 hover:bg-indigo-50 rounded-md disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                  <PlusIcon className="w-5 h-5" />
+              </button>
+            </div>
+        </form>
+      )}
     </div>
   );
 };
