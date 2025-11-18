@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Tag, COLOR_PALETTE, ColorKey } from '../types';
 import { XMarkIcon, TrashIcon, PlusIcon, CheckIcon } from './Icons';
@@ -27,7 +28,11 @@ const TagManager: React.FC<TagManagerProps> = ({ tags, onSaveTags, onClose }) =>
   };
 
   const handleDeleteTag = (id: string) => {
-    setLocalTags(localTags.filter(t => t.id !== id));
+    const updatedTags = localTags.filter(t => t.id !== id);
+    setLocalTags(updatedTags);
+    if (editingId === id) {
+        setEditingId(null);
+    }
   };
 
   const startEditing = (tag: Tag) => {
@@ -48,8 +53,18 @@ const TagManager: React.FC<TagManagerProps> = ({ tags, onSaveTags, onClose }) =>
   };
 
   const handleSaveAndClose = () => {
-    saveEditing(); // Save pending edit if any
-    onSaveTags(localTags);
+    // Calculate final state explicitly to handle pending edits immediately
+    let finalTags = [...localTags];
+    
+    if (editingId) {
+      finalTags = finalTags.map(t => 
+        t.id === editingId 
+          ? { ...t, label: editLabel, color: editColor } 
+          : t
+      );
+    }
+
+    onSaveTags(finalTags);
     onClose();
   };
 

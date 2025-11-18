@@ -155,11 +155,19 @@ const App: React.FC = () => {
     return todos.filter(todo => todo.tagId === activeTagFilterId);
   }, [todos, activeTagFilterId]);
 
-  // Stats
-  const stats = useMemo(() => ({
-    total: todos.length,
-    completed: todos.filter(t => t.completed).length
-  }), [todos]);
+  // Stats: Only count Today's tasks
+  const stats = useMemo(() => {
+    const todayStr = new Date().toLocaleDateString('ru-RU', { weekday: 'long' });
+    // Capitalize first letter to match DayOfWeek type (e.g., "понедельник" -> "Понедельник")
+    const todayName = todayStr.charAt(0).toUpperCase() + todayStr.slice(1);
+    
+    const todayTodos = todos.filter(t => t.day === todayName);
+    
+    return {
+      total: todayTodos.length,
+      completed: todayTodos.filter(t => t.completed).length
+    };
+  }, [todos]);
 
   const progress = stats.total === 0 ? 0 : Math.round((stats.completed / stats.total) * 100);
 
@@ -224,7 +232,7 @@ const App: React.FC = () => {
               {/* Progress Bar */}
               <div className="hidden md:flex items-center gap-4">
                 <div className="text-sm text-gray-500">
-                  <span className="font-medium text-indigo-600">{stats.completed}</span> / {stats.total} выполнено
+                  <span className="font-medium text-indigo-600">{stats.completed}</span> / {stats.total} сегодня
                 </div>
                 <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden ring-1 ring-gray-100">
                   <div 
